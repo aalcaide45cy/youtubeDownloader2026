@@ -5,14 +5,14 @@ echo   INICIANDO YT DOWNLOADER PREMIUM (SERVIDOR LOCAL)
 echo ===================================================
 echo.
 
-:: 1. Comprobar si FFmpeg está instalado en el sistema
+:: 1. Comprobar si FFmpeg esta instalado en el sistema
 where ffmpeg >nul 2>nul
 if %errorlevel% equ 0 goto ffmpeg_ok
 
 echo [AVISO] FFmpeg no esta instalado o no se encuentra en el PATH.
-echo FFmpeg es necesario para fusionar videos en alta calidad (1080p, 4K) y audios.
+echo FFmpeg es necesario para fusionar videos en alta calidad y audios.
 echo.
-set /p CHOICE="No tienes FFmpeg instalado en el equipo, ¿quieres que lo instale automaticamente? (S/N): "
+set /p CHOICE="No tienes FFmpeg instalado en el equipo. Quieres que lo instale automaticamente? (S/N): "
 
 if /i "%CHOICE%"=="S" goto install_ffmpeg
 if /i "%CHOICE%"=="SI" goto install_ffmpeg
@@ -23,30 +23,34 @@ echo.
 echo [INFO] Intentando instalar FFmpeg usando Winget (Windows Package Manager)...
 echo Esto puede tardar unos minutos, por favor espera...
 echo.
+
 winget install --id Gyan.FFmpeg --exact --silent --accept-source-agreements --accept-package-agreements
-if %errorlevel% equ 0 (
-    echo.
-    echo =======================================================================
-    echo   [EXITO] FFmpeg se ha instalado correctamente de manera automatica.
-    echo   [IMPORTANTE] Para que los cambios surtan efecto y se registre en la
-    echo   consola, por favor CIERRA ESTA VENTANA y vuelve a ejecutar 'run.bat'.
-    echo =======================================================================
-    echo.
-    pause
-    exit /b 0
-) else (
-    echo.
-    echo [ERROR] No se pudo instalar FFmpeg automaticamente con Winget.
-    echo Puedes instalarlo manualmente descargandolo desde: https://ffmpeg.org/
-    echo.
-    pause
-    goto ffmpeg_ok
-)
+if %errorlevel% equ 0 goto winget_success
+goto winget_fail
+
+:winget_success
+echo.
+echo =======================================================================
+echo   [EXITO] FFmpeg se ha instalado correctamente.
+echo   [IMPORTANTE] Por favor, CIERRA ESTA VENTANA y vuelve a abrir 'run.bat'
+echo   para que se aplique la nueva ruta de FFmpeg.
+echo =======================================================================
+echo.
+pause
+exit /b 0
+
+:winget_fail
+echo.
+echo [ERROR] No se pudo instalar FFmpeg automaticamente.
+echo Puedes instalarlo manualmente descargandolo desde https://ffmpeg.org/
+echo.
+pause
+goto ffmpeg_ok
 
 :no_install_ffmpeg
 echo.
 echo [ADVERTENCIA] Has decidido no instalar FFmpeg.
-echo Nota: Las descargas de video en resoluciones altas podrian fallar o descargarse sin audio.
+echo Nota: Las descargas de video en resoluciones altas podrian fallar.
 echo.
 pause
 goto ffmpeg_ok
@@ -72,7 +76,7 @@ exit /b 1
 :venv_exists
 
 :: 3. Activar entorno virtual e instalar dependencias
-echo [INFO] Verificando e instalar/actualizar dependencias necesarias...
+echo [INFO] Verificando e instalando/actualizando dependencias necesarias...
 call .venv\Scripts\activate
 if %errorlevel% neq 0 goto env_activate_error
 
@@ -104,8 +108,12 @@ echo.
 
 python main.py
 
-if %errorlevel% neq 0 (
-    echo.
-    echo [AVISO] El servidor se ha detenido con codigo de error %errorlevel%.
-    pause
-)
+if %errorlevel% neq 0 goto server_error
+goto end
+
+:server_error
+echo.
+echo [AVISO] El servidor se ha detenido con codigo de error %errorlevel%.
+pause
+
+:end
