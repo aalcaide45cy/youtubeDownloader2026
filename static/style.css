@@ -929,3 +929,36 @@ body {
 .scrollbar::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.25);
 }
+
+/* Selector de Navegador para Cookies (Login) */
+.browser-select-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-left: 1px solid var(--border-color);
+    padding-left: 0.9rem;
+    padding-right: 0.3rem;
+}
+
+.browser-select-wrapper select {
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text-main);
+    font-size: 0.9rem;
+    font-family: var(--font-body);
+    cursor: pointer;
+    padding-right: 0.5rem;
+}
+
+.browser-select-wrapper select option {
+    background: #0f0c24;
+    color: var(--text-main);
+}
+
+.browser-icon {
+    color: var(--accent);
+    font-size: 1rem;
+    filter: drop-shadow(0 0 4px var(--accent-glow));
+}
+

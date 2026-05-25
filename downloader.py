@@ -21,7 +21,9 @@ COMMON_LANGUAGES = {
 }
 
 def get_language_name(code):
-    # Intentar obtener el nombre del código directo o buscar el prefijo (ej: es-ES -> es)
+    if not code:
+        return None
+    # Limpiar posibles sufijos (ej: es-ES -> es, en-US -> en) o buscar coincidencia exacta primero
     name = COMMON_LANGUAGES.get(code)
     if not name and '-' in code:
         base_code = code.split('-')[0]
@@ -49,9 +51,9 @@ def format_duration(seconds):
         return f"{hours:02d}:{minutes:02d}:{secs:02d}"
     return f"{minutes:02d}:{secs:02d}"
 
-def extract_video_info(url):
+def extract_video_info(url, browser_name=None):
     """
-    Extrae la información del video usando yt-dlp.
+    Extrae la información del video usando yt-dlp, opcionalmente cargando cookies de un navegador.
     """
     ydl_opts = {
         'skip_download': True,
@@ -59,11 +61,24 @@ def extract_video_info(url):
         'quiet': True,
         'no_warnings': True,
     }
+    
+    if browser_name and browser_name.lower() != "none":
+        ydl_opts['cookiesfrombrowser'] = (browser_name.lower(),)
+        
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             info = ydl.extract_info(url, download=False)
+        except yt_dlp.utils.DownloadError as e:
+            # Capturar errores comunes de cookies bloqueadas
+            msg = str(e)
+            if "cookie" in msg.lower() or "browser" in msg.lower():
+                raise RuntimeError(
+                    f"Error de cookies del navegador '{browser_name}'. "
+                    f"Por favor, cierra tu navegador por completo para desbloquear su base de datos de cookies e inténtalo de nuevo."
+                )
+            raise RuntimeError(f"Error al analizar el enlace de YouTube: {msg}")
         except Exception as e:
-            raise RuntimeError(f"Error al analizar el enlace de YouTube: {str(e)}")
+            raise RuntimeError(f"Error inesperado al analizar el video: {str(e)}")
             
         if not info:
             raise RuntimeError("No se pudo obtener información del video.")
@@ -87,7 +102,6 @@ def extract_video_info(url):
         seen_resolutions = set()
         
         for f in formats:
-            # vcodec != 'none' significa que tiene pista de video
             if f.get('vcodec') != 'none':
                 height = f.get('height')
                 if not height:
@@ -96,13 +110,9 @@ def extract_video_info(url):
                 fps = f.get('fps')
                 filesize = f.get('filesize') or f.get('filesize_approx')
                 
-                # Agrupamos por altura (ej: 1080, 720) y extensión
-                # y nos quedamos con el de mayor fps/bitrate
                 res_key = f"{height}p_{ext}"
                 
                 if res_key in seen_resolutions:
-                    # Si ya lo vimos, actualizamos si este tiene mejor fps o bitrate
-                    # o si el anterior no tenía peso de archivo y este sí
                     idx = next(i for i, vf in enumerate(video_formats) if vf['height'] == height and vf['ext'] == ext)
                     old_f = video_formats[idx]
                     old_fps = old_f['fps'] or 0
@@ -142,13 +152,23 @@ def extract_video_info(url):
         for f in formats:
             if f.get('vcodec') == 'none' and f.get('acodec') != 'none':
                 ext = f.get('ext')
-                abr = f.get('abr') # bitrate de audio
+                abr = f.get('abr')
                 filesize = f.get('filesize') or f.get('filesize_approx')
                 
-                audio_key = f"{ext}_{abr}"
+                # Extraer idioma si existe
+                lang = f.get('language')
+                lang_code = lang if (lang and lang != 'und') else None
+                lang_name = get_language_name(lang_code)
+                
+                # Agregamos idioma a la clave de unicidad para listar los distintos idiomas disponibles
+                audio_key = f"{ext}_{abr}_{lang_code}"
                 if audio_key in seen_audios:
                     continue
                 seen_audios.add(audio_key)
+                
+                audio_name = f"{ext.upper()} - {int(abr)} kbps" if abr else f"{ext.upper()} - Calidad estándar"
+                if lang_name:
+                    audio_name += f" ({lang_name})"
                 
                 audio_formats.append({
                     'format_id': f.get('format_id'),
@@ -156,7 +176,9 @@ def extract_video_info(url):
                     'abr': abr,
                     'filesize': filesize,
                     'filesize_string': format_size(filesize) if filesize else ("Estimado: " + format_size(f.get('filesize_approx')) if f.get('filesize_approx') else "Desconocido"),
-                    'audio_name': f"{ext.upper()} - {int(abr)} kbps" if abr else f"{ext.upper()} - Calidad estándar",
+                    'audio_name': audio_name,
+                    'language': lang_code,
+                    'language_name': lang_name
                 })
                 
         # Ordenar audios por bitrate descendente
@@ -226,9 +248,9 @@ class DownloadProgressHook:
                 'filename': os.path.basename(d.get('filename', ''))
             })
 
-def download_item(url, item_type, selection_val, download_dir, progress_callback, item_id):
+def download_item(url, item_type, selection_val, download_dir, progress_callback, item_id, browser_name=None, associated_audio_val=None):
     """
-    Descarga un elemento específico (video, audio o subtítulo) en la carpeta indicada.
+    Descarga un elemento específico en la carpeta indicada.
     """
     ydl_opts = {
         'outtmpl': os.path.join(download_dir, '%(title)s.%(ext)s'),
@@ -237,18 +259,19 @@ def download_item(url, item_type, selection_val, download_dir, progress_callback
         'no_warnings': True,
     }
     
+    if browser_name and browser_name.lower() != "none":
+        ydl_opts['cookiesfrombrowser'] = (browser_name.lower(),)
+    
     if item_type == 'video':
-        # Para video, si no tiene audio integrado (es adaptativo),
-        # le pedimos a yt-dlp que descargue el video seleccionado y el mejor audio,
-        # y los combine automáticamente con ffmpeg en el formato especificado
-        # Para ello, usamos el formato: 'format_id+bestaudio/best'
-        ydl_opts['format'] = f"{selection_val}+bestaudio/best"
-        ydl_opts['merge_output_format'] = 'mp4' # Forzar contenedor amigable
+        # Si hay un audio específico seleccionado (ej: en español), fusionamos con ese format_id
+        if associated_audio_val:
+            ydl_opts['format'] = f"{selection_val}+{associated_audio_val}"
+        else:
+            ydl_opts['format'] = f"{selection_val}+bestaudio/best"
+        ydl_opts['merge_output_format'] = 'mp4'
     elif item_type == 'audio':
-        # Descarga solo audio
         ydl_opts['format'] = selection_val
     elif item_type == 'subtitle':
-        # Descarga solo subtítulos (no el video)
         ydl_opts['skip_download'] = True
         ydl_opts['writesubtitles'] = True
         ydl_opts['subtitleslangs'] = [selection_val]
@@ -257,6 +280,21 @@ def download_item(url, item_type, selection_val, download_dir, progress_callback
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             ydl.download([url])
+        except yt_dlp.utils.DownloadError as e:
+            msg = str(e)
+            if "cookie" in msg.lower() or "browser" in msg.lower():
+                err_msg = (
+                    f"Error de cookies. Por favor, cierra tu navegador '{browser_name}' "
+                    f"completamente para liberar la base de datos de cookies e inténtalo de nuevo."
+                )
+            else:
+                err_msg = msg
+            progress_callback({
+                'id': item_id,
+                'status': 'error',
+                'error': err_msg
+            })
+            raise RuntimeError(err_msg)
         except Exception as e:
             progress_callback({
                 'id': item_id,

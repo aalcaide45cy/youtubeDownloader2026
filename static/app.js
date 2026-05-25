@@ -33,6 +33,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnDownload = document.getElementById("btn-download");
     const selectedCount = document.getElementById("selected-count");
     
+    // Selector de cookies del navegador
+    const browserCookies = document.getElementById("browser-cookies");
+    
     // Sección de Descargas Activas
     const downloadsSection = document.getElementById("downloads-section");
     const downloadsProgressList = document.getElementById("downloads-progress-list");
@@ -109,7 +112,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({ url })
+                body: JSON.stringify({ url, browser: browserCookies.value })
             });
 
             const data = await response.json();
@@ -354,12 +357,22 @@ document.addEventListener("DOMContentLoaded", () => {
         downloadsSection.classList.remove("hidden");
         downloadsTotalBadge.textContent = `${selectedItems.size} descarga(s)`;
 
+        // Detectar si hay un audio seleccionado de forma cruzada para combinar con los vídeos
+        const selectedAudio = Array.from(selectedItems.values()).find(info => info.type === 'audio');
+
         // Formatear items para enviar a la API
-        const itemsPayload = Array.from(selectedItems.values()).map(info => ({
-            id: info.id,
-            type: info.type,
-            val: info.val
-        }));
+        const itemsPayload = Array.from(selectedItems.values()).map(info => {
+            const item = {
+                id: info.id,
+                type: info.type,
+                val: info.val
+            };
+            // Si es video y el usuario seleccionó un audio de idioma específico, lo asociamos para fusión
+            if (info.type === "video" && selectedAudio) {
+                item.audio_val = selectedAudio.val;
+            }
+            return item;
+        });
 
         // Crear elementos de progreso en la UI para cada item antes de iniciar
         selectedItems.forEach((info) => {
@@ -375,7 +388,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 body: JSON.stringify({
                     url: inputUrl.value.trim(),
                     items: itemsPayload,
-                    download_dir: currentDownloadFolder
+                    download_dir: currentDownloadFolder,
+                    browser: browserCookies.value
                 })
             });
 

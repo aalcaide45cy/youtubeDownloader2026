@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from concurrent.futures import ThreadPoolExecutor
 
 # Importar funciones de descarga
 from downloader import extract_video_info, download_item, format_size
@@ -31,16 +32,19 @@ DEFAULT_DOWNLOAD_DIR = str(pathlib.Path.home() / "Downloads")
 
 class AnalyzeRequest(BaseModel):
     url: str
+    browser: Optional[str] = None
 
 class DownloadItemRequest(BaseModel):
     id: str
     type: str # 'video', 'audio', or 'subtitle'
     val: str  # format_id o idioma del subtítulo
+    audio_val: Optional[str] = None # ID de audio específico asociado para combinar con el video
 
 class DownloadRequest(BaseModel):
     url: str
     items: List[DownloadItemRequest]
     download_dir: Optional[str] = None
+    browser: Optional[str] = None
 
 @app.get("/api/default-folder")
 def get_default_folder():
@@ -60,7 +64,7 @@ def analyze_video(request: AnalyzeRequest):
     if not request.url:
         raise HTTPException(status_code=400, detail="Se requiere una URL válida.")
     try:
-        info = extract_video_info(request.url)
+        info = extract_video_info(request.url, request.browser)
         return info
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -96,8 +100,8 @@ def select_folder():
 @app.post("/api/download")
 def download_stream(request: DownloadRequest):
     """
-    Inicia la descarga de los elementos seleccionados y transmite el progreso
-    en tiempo real usando Server-Sent Events (SSE).
+    Inicia la descarga de los elementos seleccionados de forma concurrente
+    y transmite el progreso en tiempo real usando Server-Sent Events (SSE).
     """
     download_dir = request.download_dir or DEFAULT_DOWNLOAD_DIR
     if not os.path.exists(download_dir):
@@ -109,45 +113,68 @@ def download_stream(request: DownloadRequest):
     q = queue.Queue()
 
     def run_downloads():
-        for item in request.items:
-            item_id = item.id
-            item_type = item.type
-            val = item.val
-            try:
-                # Notificar inicio de la descarga del item
-                q.put({
-                    "id": item_id,
-                    "status": "started",
-                    "type": item_type
-                })
+        # Descarga concurrente: máximo 4 descargas en paralelo
+        max_workers = min(len(request.items), 4)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = []
+            for item in request.items:
+                item_id = item.id
+                item_type = item.type
+                val = item.val
+                audio_val = item.audio_val
                 
-                # Callback que se ejecuta desde la librería yt-dlp en este hilo
-                def progress_callback(data):
-                    q.put({
-                        "id": item_id,
-                        "status": "progress",
-                        "data": data
-                    })
+                # Función que envolverá la llamada individual de descarga
+                def download_task(i_id, i_type, v, a_v):
+                    try:
+                        # Notificar inicio de la descarga
+                        q.put({
+                            "id": i_id,
+                            "status": "started",
+                            "type": i_type
+                        })
+                        
+                        def progress_callback(data):
+                            q.put({
+                                "id": i_id,
+                                "status": "progress",
+                                "data": data
+                            })
+                        
+                        download_item(
+                            request.url,
+                            i_type,
+                            v,
+                            download_dir,
+                            progress_callback,
+                            i_id,
+                            browser_name=request.browser,
+                            associated_audio_val=a_v
+                        )
+                        
+                        # Notificar completado
+                        q.put({
+                            "id": i_id,
+                            "status": "completed"
+                        })
+                    except Exception as e:
+                        # Notificar error
+                        q.put({
+                            "id": i_id,
+                            "status": "failed",
+                            "error": str(e)
+                        })
 
-                download_item(request.url, item_type, val, download_dir, progress_callback, item_id)
+                # Lanzar tarea en el pool de hilos
+                futures.append(executor.submit(download_task, item_id, item_type, val, audio_val))
+            
+            # Esperar a que terminen todas las descargas del pool
+            for future in futures:
+                future.result()
 
-                # Notificar finalización exitosa del item
-                q.put({
-                    "id": item_id,
-                    "status": "completed"
-                })
-            except Exception as e:
-                # Notificar error en este item
-                q.put({
-                    "id": item_id,
-                    "status": "failed",
-                    "error": str(e)
-                })
-        
-        # Notificar fin de todo el proceso de descargas
+        # Notificar fin de todo el lote de descargas
         q.put({"status": "done"})
 
-    # Iniciar la descarga en un hilo secundario para no bloquear el bucle de eventos de FastAPI
+    # Iniciar la descarga en un hilo secundario para no bloquear el bucle de FastAPI
     threading.Thread(target=run_downloads, daemon=True).start()
 
     # Generador de eventos SSE
@@ -169,7 +196,6 @@ def download_stream(request: DownloadRequest):
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 # Montar los archivos estáticos del frontend
-# Nota: La carpeta 'static' debe crearse y contener index.html, style.css, app.js
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if not os.path.exists(static_dir):
     os.makedirs(static_dir, exist_ok=True)

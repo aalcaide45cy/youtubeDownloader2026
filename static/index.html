@@ -34,6 +34,22 @@
                 <div class="input-group">
                     <i class="fas fa-link input-icon"></i>
                     <input type="text" id="youtube-url" placeholder="Pega el enlace del video de YouTube aquí..." autocomplete="off">
+                    
+                    <!-- Selector de cookies del navegador para Login -->
+                    <div class="browser-select-wrapper">
+                        <i class="fas fa-user-shield browser-icon" title="Usar sesión del navegador para descargar vídeos privados o restringidos"></i>
+                        <select id="browser-cookies" title="Importar cookies de sesión de tu navegador">
+                            <option value="none">Sin Login</option>
+                            <option value="chrome">Chrome</option>
+                            <option value="edge">Edge</option>
+                            <option value="firefox">Firefox</option>
+                            <option value="brave">Brave</option>
+                            <option value="opera">Opera</option>
+                            <option value="vivaldi">Vivaldi</option>
+                            <option value="safari">Safari</option>
+                        </select>
+                    </div>
+
                     <button id="btn-analyze" class="btn btn-primary">
                         <span id="btn-analyze-text">Analizar</span>
                         <i id="btn-analyze-spinner" class="fas fa-spinner fa-spin hidden"></i>
