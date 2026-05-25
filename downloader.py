@@ -23,7 +23,6 @@ COMMON_LANGUAGES = {
 def get_language_name(code):
     if not code:
         return None
-    # Limpiar posibles sufijos (ej: es-ES -> es, en-US -> en) o buscar coincidencia exacta primero
     name = COMMON_LANGUAGES.get(code)
     if not name and '-' in code:
         base_code = code.split('-')[0]
@@ -69,7 +68,6 @@ def extract_video_info(url, browser_name=None):
         try:
             info = ydl.extract_info(url, download=False)
         except yt_dlp.utils.DownloadError as e:
-            # Capturar errores comunes de cookies bloqueadas
             msg = str(e)
             if "cookie" in msg.lower() or "browser" in msg.lower():
                 raise RuntimeError(
@@ -110,6 +108,23 @@ def extract_video_info(url, browser_name=None):
                 fps = f.get('fps')
                 filesize = f.get('filesize') or f.get('filesize_approx')
                 
+                # Extraer bitrate de video
+                vbr = f.get('vbr') or f.get('tbr')
+                vbr_string = None
+                if vbr:
+                    if vbr >= 1000:
+                        vbr_string = f"{vbr/1000:.1f} Mbps"
+                    else:
+                        vbr_string = f"{int(vbr)} kbps"
+                
+                # Limpiar nombre de códec de video
+                vcodec = f.get('vcodec', '')
+                if 'av01' in vcodec: codec_name = 'AV1'
+                elif 'vp09' in vcodec or 'vp9' in vcodec: codec_name = 'VP9'
+                elif 'avc' in vcodec or 'h264' in vcodec: codec_name = 'H.264'
+                elif 'hev' in vcodec or 'h265' in vcodec: codec_name = 'H.265'
+                else: codec_name = vcodec.split('.')[0].upper() if vcodec else "Desconocido"
+                
                 res_key = f"{height}p_{ext}"
                 
                 if res_key in seen_resolutions:
@@ -126,7 +141,9 @@ def extract_video_info(url, browser_name=None):
                             'filesize': filesize,
                             'filesize_string': format_size(filesize) if filesize else "Estimado: " + format_size(f.get('filesize_approx')),
                             'resolution_name': f"{height}p ({ext.upper()})" + (f" - {fps}fps" if fps else ""),
-                            'acodec': f.get('acodec')
+                            'acodec': f.get('acodec'),
+                            'vbr_string': vbr_string,
+                            'codec_name': codec_name
                         }
                     continue
                     
@@ -139,7 +156,9 @@ def extract_video_info(url, browser_name=None):
                     'filesize': filesize,
                     'filesize_string': format_size(filesize) if filesize else ("Estimado: " + format_size(f.get('filesize_approx')) if f.get('filesize_approx') else "Desconocido"),
                     'resolution_name': f"{height}p ({ext.upper()})" + (f" - {fps}fps" if fps else ""),
-                    'acodec': f.get('acodec')
+                    'acodec': f.get('acodec'),
+                    'vbr_string': vbr_string,
+                    'codec_name': codec_name
                 })
 
         # Ordenar videos por resolución descendente
@@ -155,12 +174,17 @@ def extract_video_info(url, browser_name=None):
                 abr = f.get('abr')
                 filesize = f.get('filesize') or f.get('filesize_approx')
                 
-                # Extraer idioma si existe
+                # Extraer códec de audio
+                acodec = f.get('acodec', '')
+                if 'mp4a' in acodec or 'aac' in acodec: codec_name = 'AAC'
+                elif 'opus' in acodec: codec_name = 'Opus'
+                elif 'mp3' in acodec: codec_name = 'MP3'
+                else: codec_name = acodec.split('.')[0].upper() if acodec else "Desconocido"
+                
                 lang = f.get('language')
                 lang_code = lang if (lang and lang != 'und') else None
                 lang_name = get_language_name(lang_code)
                 
-                # Agregamos idioma a la clave de unicidad para listar los distintos idiomas disponibles
                 audio_key = f"{ext}_{abr}_{lang_code}"
                 if audio_key in seen_audios:
                     continue
@@ -178,7 +202,8 @@ def extract_video_info(url, browser_name=None):
                     'filesize_string': format_size(filesize) if filesize else ("Estimado: " + format_size(f.get('filesize_approx')) if f.get('filesize_approx') else "Desconocido"),
                     'audio_name': audio_name,
                     'language': lang_code,
-                    'language_name': lang_name
+                    'language_name': lang_name,
+                    'codec_name': codec_name
                 })
                 
         # Ordenar audios por bitrate descendente
@@ -226,9 +251,9 @@ class DownloadProgressHook:
             total = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
             downloaded = d.get('downloaded_bytes', 0)
             percentage = (downloaded / total * 100) if total > 0 else 0
-            speed = d.get('speed') # bytes/seg
+            speed = d.get('speed')
             speed_str = format_size(speed) + "/s" if speed else "Calculando..."
-            eta = d.get('eta') # segundos
+            eta = d.get('eta')
             eta_str = f"{eta}s" if eta is not None else "Desconocido"
             
             self.callback({
@@ -263,7 +288,6 @@ def download_item(url, item_type, selection_val, download_dir, progress_callback
         ydl_opts['cookiesfrombrowser'] = (browser_name.lower(),)
     
     if item_type == 'video':
-        # Si hay un audio específico seleccionado (ej: en español), fusionamos con ese format_id
         if associated_audio_val:
             ydl_opts['format'] = f"{selection_val}+{associated_audio_val}"
         else:

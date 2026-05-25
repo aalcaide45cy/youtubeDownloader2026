@@ -962,3 +962,34 @@ body {
     filter: drop-shadow(0 0 4px var(--accent-glow));
 }
 
+/* Botón interactivo para abrir carpeta al finalizar descarga */
+.btn-open-folder {
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: var(--success);
+    font-family: var(--font-heading);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.28rem 0.65rem;
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    text-transform: uppercase;
+    letter-spacing: 0.2px;
+}
+
+.btn-open-folder:hover {
+    background: rgba(16, 185, 129, 0.25);
+    border-color: var(--success);
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.25);
+    transform: scale(1.03);
+}
+
+.btn-open-folder:active {
+    transform: scale(0.98);
+}
+
+

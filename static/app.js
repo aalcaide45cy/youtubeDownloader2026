@@ -184,12 +184,20 @@ document.addEventListener("DOMContentLoaded", () => {
         // 2. Renderizar Resoluciones (Video)
         if (data.video_formats && data.video_formats.length > 0) {
             data.video_formats.forEach(f => {
+                let videoNote = f.acodec !== 'none' ? "Video + Audio integrados" : "Solo Video (Audio combinado automáticamente)";
+                let infoParts = [];
+                if (f.vbr_string) infoParts.push(`Tasa: ${f.vbr_string}`);
+                if (f.codec_name) infoParts.push(`Códec: ${f.codec_name}`);
+                if (infoParts.length > 0) {
+                    videoNote += " | " + infoParts.join(" | ");
+                }
+
                 const item = createFormatRow({
                     id: `v-${f.format_id}`,
                     type: "video",
                     val: f.format_id,
                     title: f.resolution_name,
-                    note: f.acodec !== 'none' ? "Video + Audio integrados" : "Solo Video (Audio combinado automáticamente al descargar)",
+                    note: videoNote,
                     size: f.filesize_string,
                     badgeClass: "badge-video-tag",
                     badgeText: "Video"
@@ -203,12 +211,17 @@ document.addEventListener("DOMContentLoaded", () => {
         // 3. Renderizar Audios
         if (data.audio_formats && data.audio_formats.length > 0) {
             data.audio_formats.forEach(f => {
+                let audioNote = `Formato de audio puro (.${f.ext})`;
+                if (f.codec_name) {
+                    audioNote += ` | Códec: ${f.codec_name}`;
+                }
+
                 const item = createFormatRow({
                     id: `a-${f.format_id}`,
                     type: "audio",
                     val: f.format_id,
                     title: f.audio_name,
-                    note: `Formato de audio puro (.${f.ext})`,
+                    note: audioNote,
                     size: f.filesize_string,
                     badgeClass: "badge-audio-tag",
                     badgeText: "Audio"
@@ -517,7 +530,22 @@ document.addEventListener("DOMContentLoaded", () => {
             
             statusSpan.className = "progress-status status-finished";
             statusSpan.innerHTML = `<i class="fas fa-circle-check"></i> Completado`;
-            speedEtaSpan.textContent = "Descarga finalizada";
+            
+            // Reemplazar el texto de velocidad con un botón interactivo de abrir carpeta
+            speedEtaSpan.innerHTML = `
+                <button class="btn-open-folder" title="Abrir carpeta de descargas en Windows Explorer">
+                    <i class="fas fa-folder-open"></i> Abrir Carpeta
+                </button>
+            `;
+            
+            const btnOpen = speedEtaSpan.querySelector(".btn-open-folder");
+            btnOpen.addEventListener("click", () => {
+                fetch("/api/open-folder", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ folder_path: currentDownloadFolder })
+                }).catch(err => console.error("Error al abrir carpeta:", err));
+            });
             
             // Animación suave de éxito
             card.style.boxShadow = "0 0 10px rgba(16, 185, 129, 0.15)";

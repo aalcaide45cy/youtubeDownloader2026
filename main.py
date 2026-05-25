@@ -46,6 +46,9 @@ class DownloadRequest(BaseModel):
     download_dir: Optional[str] = None
     browser: Optional[str] = None
 
+class OpenFolderRequest(BaseModel):
+    folder_path: str
+
 @app.get("/api/default-folder")
 def get_default_folder():
     """
@@ -55,6 +58,24 @@ def get_default_folder():
         "status": "success",
         "folder": os.path.normpath(DEFAULT_DOWNLOAD_DIR)
     }
+
+@app.post("/api/open-folder")
+def open_folder(request: OpenFolderRequest):
+    """
+    Abre la carpeta de descarga en el explorador de archivos nativo de Windows.
+    """
+    path = request.folder_path
+    if not path:
+        path = DEFAULT_DOWNLOAD_DIR
+        
+    if os.path.exists(path):
+        try:
+            os.startfile(os.path.normpath(path))
+            return {"status": "success"}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"No se pudo abrir la carpeta: {str(e)}")
+    else:
+        raise HTTPException(status_code=404, detail="La carpeta especificada no existe.")
 
 @app.post("/api/analyze")
 def analyze_video(request: AnalyzeRequest):
