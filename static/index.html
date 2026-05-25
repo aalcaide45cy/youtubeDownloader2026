@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Downloader Premium</title>
+    <!-- Google Fonts: Outfit e Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome para iconos modernos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Archivo CSS principal -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="stars"></div>
+    <div class="glowing-orb orb-1"></div>
+    <div class="glowing-orb orb-2"></div>
+
+    <div class="app-container">
+        <!-- Encabezado Principal -->
+        <header class="app-header">
+            <div class="logo">
+                <i class="fab fa-youtube logo-icon animate-pulse"></i>
+                <h1 id="app-title">YT Downloader <span>Premium</span></h1>
+            </div>
+            <p class="subtitle">Analiza y descarga videos en máxima calidad de forma simple y elegante</p>
+        </header>
+
+        <!-- Sección de Entrada URL -->
+        <main class="main-content">
+            <section class="url-section glass-panel">
+                <div class="input-group">
+                    <i class="fas fa-link input-icon"></i>
+                    <input type="text" id="youtube-url" placeholder="Pega el enlace del video de YouTube aquí..." autocomplete="off">
+                    <button id="btn-analyze" class="btn btn-primary">
+                        <span id="btn-analyze-text">Analizar</span>
+                        <i id="btn-analyze-spinner" class="fas fa-spinner fa-spin hidden"></i>
+                    </button>
+                </div>
+                <p id="error-message" class="error-text hidden"></p>
+            </section>
+
+            <!-- Esqueleto de Carga (Skeleton Loader) -->
+            <section id="skeleton-loader" class="glass-panel hidden">
+                <div class="skeleton-grid">
+                    <div class="skeleton-card">
+                        <div class="skeleton skeleton-thumb"></div>
+                        <div class="skeleton skeleton-title"></div>
+                        <div class="skeleton skeleton-text"></div>
+                    </div>
+                    <div class="skeleton-details">
+                        <div class="skeleton skeleton-tabs"></div>
+                        <div class="skeleton skeleton-list-item"></div>
+                        <div class="skeleton skeleton-list-item"></div>
+                        <div class="skeleton skeleton-list-item"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección de Resultados (Oculta al inicio) -->
+            <section id="results-section" class="results-section hidden">
+                <div class="results-grid">
+                    <!-- Tarjeta de Vista Previa del Video -->
+                    <div class="video-preview-card glass-panel">
+                        <div class="thumbnail-wrapper">
+                            <img id="video-thumbnail" src="" alt="Miniatura del Video">
+                            <span id="video-duration" class="duration-badge">00:00</span>
+                        </div>
+                        <div class="video-info">
+                            <h2 id="video-title">Título del Video</h2>
+                            <p id="video-channel" class="channel-name"><i class="fas fa-user-circle"></i> Canal</p>
+                            <p id="video-views" class="views-count"><i class="fas fa-eye"></i> 0 vistas</p>
+                        </div>
+                    </div>
+
+                    <!-- Panel de Formatos / Pestañas de Selección -->
+                    <div class="formats-panel glass-panel">
+                        <!-- Cabecera de Pestañas -->
+                        <div class="tab-header">
+                            <button class="tab-btn active" data-tab="tab-resolutions" id="tab-btn-resolutions">
+                                <i class="fas fa-tv"></i> Resoluciones
+                            </button>
+                            <button class="tab-btn" data-tab="tab-audios" id="tab-btn-audios">
+                                <i class="fas fa-volume-up"></i> Audios
+                            </button>
+                            <button class="tab-btn" data-tab="tab-subtitles" id="tab-btn-subtitles">
+                                <i class="fas fa-closed-captioning"></i> Subtítulos
+                            </button>
+                        </div>
+
+                        <!-- Contenido de las Pestañas -->
+                        <div class="tab-content">
+                            <!-- Pestaña de Resoluciones -->
+                            <div id="tab-resolutions" class="tab-pane active">
+                                <div class="options-container scrollbar" id="resolutions-list">
+                                    <!-- Rellenado dinámicamente -->
+                                </div>
+                            </div>
+
+                            <!-- Pestaña de Audios -->
+                            <div id="tab-audios" class="tab-pane">
+                                <div class="options-container scrollbar" id="audios-list">
+                                    <!-- Rellenado dinámicamente -->
+                                </div>
+                            </div>
+
+                            <!-- Pestaña de Subtítulos -->
+                            <div id="tab-subtitles" class="tab-pane">
+                                <div class="options-container scrollbar" id="subtitles-list">
+                                    <!-- Rellenado dinámicamente -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección de Configuración de Carpeta y Descarga -->
+                <div class="download-config-panel glass-panel">
+                    <div class="folder-selector">
+                        <div class="folder-info">
+                            <span class="label">Guardar en:</span>
+                            <span id="download-folder-path" class="path" title="Carpeta de descarga">Cargando carpeta predeterminada...</span>
+                        </div>
+                        <button id="btn-change-folder" class="btn btn-secondary" title="Cambiar Carpeta de Descarga">
+                            <i class="fas fa-folder-open"></i> <span>Cambiar</span>
+                        </button>
+                    </div>
+
+                    <div class="download-trigger">
+                        <button id="btn-download" class="btn btn-download-primary" disabled>
+                            <i class="fas fa-download"></i> <span>Descargar Elementos Seleccionados (<span id="selected-count">0</span>)</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección de Descargas Activas (Oculta al inicio) -->
+            <section id="downloads-section" class="downloads-section glass-panel hidden">
+                <div class="downloads-header">
+                    <h3><i class="fas fa-tasks text-gradient"></i> Estado de Descargas</h3>
+                    <span id="downloads-total-badge" class="badge">0 descargas</span>
+                </div>
+                <div class="downloads-list scrollbar" id="downloads-progress-list">
+                    <!-- Filas de descargas activas insertadas dinámicamente -->
+                </div>
+            </section>
+        </main>
+
+        <!-- Pie de Página -->
+        <footer class="app-footer">
+            <p>YT Downloader Premium &copy; 2026. Creado con fines educativos y uso personal.</p>
+        </footer>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
