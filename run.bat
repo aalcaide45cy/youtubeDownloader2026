@@ -7,70 +7,94 @@ echo.
 
 :: 1. Comprobar si FFmpeg está instalado en el sistema
 where ffmpeg >nul 2>nul
-if %errorlevel% neq 0 (
-    echo [AVISO] FFmpeg no esta instalado o no se encuentra en el PATH.
-    echo FFmpeg es necesario para fusionar videos en alta calidad (1080p, 4K) y audios.
+if %errorlevel% equ 0 goto ffmpeg_ok
+
+echo [AVISO] FFmpeg no esta instalado o no se encuentra en el PATH.
+echo FFmpeg es necesario para fusionar videos en alta calidad (1080p, 4K) y audios.
+echo.
+set /p CHOICE="No tienes FFmpeg instalado en el equipo, ¿quieres que lo instale automaticamente? (S/N): "
+
+if /i "%CHOICE%"=="S" goto install_ffmpeg
+if /i "%CHOICE%"=="SI" goto install_ffmpeg
+goto no_install_ffmpeg
+
+:install_ffmpeg
+echo.
+echo [INFO] Intentando instalar FFmpeg usando Winget (Windows Package Manager)...
+echo Esto puede tardar unos minutos, por favor espera...
+echo.
+winget install --id Gyan.FFmpeg --exact --silent --accept-source-agreements --accept-package-agreements
+if %errorlevel% equ 0 (
     echo.
-    set /p CHOICE="No tienes FFmpeg instalado en el equipo, ¿quieres que lo instale automaticamente? (S/N): "
-    
-    if /i "%CHOICE%"=="S" (
-        echo.
-        echo [INFO] Intentando instalar FFmpeg usando Winget (Windows Package Manager)...
-        echo Esto puede tardar unos minutos, por favor espera...
-        echo.
-        
-        winget install --id Gyan.FFmpeg --exact --silent --accept-source-agreements --accept-package-agreements
-        
-        if %errorlevel% equ 0 (
-            echo.
-            echo =======================================================================
-            echo   [EXITO] FFmpeg se ha instalado correctamente de manera automatica.
-            echo   [IMPORTANTE] Para que los cambios surtan efecto y se registre en la
-            echo   consola, por favor CIERRA ESTA VENTANA y vuelve a ejecutar 'run.bat'.
-            echo =======================================================================
-            echo.
-            pause
-            exit /b 0
-        ) else (
-            echo.
-            echo [ERROR] No se pudo instalar FFmpeg automaticamente.
-            echo Posibles razones:
-            echo - No tienes conexion a Internet o Winget no esta disponible.
-            echo - Windows SmartScreen o permisos de administrador detuvieron la instalacion.
-            echo.
-            echo Puedes instalarlo manualmente descargandolo desde: https://ffmpeg.org/
-            echo.
-            pause
-        )
-    ) else (
-        echo.
-        echo [ADVERTENCIA] Has decidido no instalar FFmpeg.
-        echo Nota: Las descargas de video en resoluciones altas podrian fallar o descargarse sin audio.
-        echo.
-        pause
-    )
+    echo =======================================================================
+    echo   [EXITO] FFmpeg se ha instalado correctamente de manera automatica.
+    echo   [IMPORTANTE] Para que los cambios surtan efecto y se registre en la
+    echo   consola, por favor CIERRA ESTA VENTANA y vuelve a ejecutar 'run.bat'.
+    echo =======================================================================
+    echo.
+    pause
+    exit /b 0
+) else (
+    echo.
+    echo [ERROR] No se pudo instalar FFmpeg automaticamente con Winget.
+    echo Puedes instalarlo manualmente descargandolo desde: https://ffmpeg.org/
+    echo.
+    pause
+    goto ffmpeg_ok
 )
 
+:no_install_ffmpeg
+echo.
+echo [ADVERTENCIA] Has decidido no instalar FFmpeg.
+echo Nota: Las descargas de video en resoluciones altas podrian fallar o descargarse sin audio.
+echo.
+pause
+goto ffmpeg_ok
+
+:ffmpeg_ok
+
 :: 2. Comprobar si existe el entorno virtual .venv
-if not exist .venv (
-    echo [INFO] Creando el entorno virtual .venv...
-    python -m venv .venv
-    if errorlevel 1 (
-        echo [ERROR] No se pudo crear el entorno virtual. Asegurate de tener Python instalado y en tu PATH.
-        pause
-        exit /b 1
-    )
-)
+if exist .venv goto venv_exists
+
+echo [INFO] Creando el entorno virtual .venv...
+python -m venv .venv
+if %errorlevel% neq 0 goto venv_error
+goto venv_exists
+
+:venv_error
+echo.
+echo [ERROR] No se pudo crear el entorno virtual. 
+echo Asegurate de tener Python instalado y en tu PATH de Windows.
+echo.
+pause
+exit /b 1
+
+:venv_exists
 
 :: 3. Activar entorno virtual e instalar dependencias
 echo [INFO] Verificando e instalar/actualizar dependencias necesarias...
 call .venv\Scripts\activate
+if %errorlevel% neq 0 goto env_activate_error
+
 python -m pip install fastapi uvicorn yt-dlp
-if errorlevel 1 (
-    echo [ERROR] No se pudieron instalar las dependencias de Python.
-    pause
-    exit /b 1
-)
+if %errorlevel% neq 0 goto pip_error
+goto dependencies_ok
+
+:env_activate_error
+echo.
+echo [ERROR] No se pudo activar el entorno virtual (.venv\Scripts\activate).
+echo.
+pause
+exit /b 1
+
+:pip_error
+echo.
+echo [ERROR] No se pudieron instalar las dependencias de Python usando pip.
+echo.
+pause
+exit /b 1
+
+:dependencies_ok
 
 echo.
 echo [INFO] Iniciando el servidor FastAPI en http://127.0.0.1:8000...
@@ -80,8 +104,8 @@ echo.
 
 python main.py
 
-if errorlevel 1 (
+if %errorlevel% neq 0 (
     echo.
-    echo [WARN] El servidor se ha detenido.
+    echo [AVISO] El servidor se ha detenido con codigo de error %errorlevel%.
     pause
 )
