@@ -195,7 +195,7 @@ document.addEventListener("DOMContentLoaded", () => {
         videoThumbnail.src = meta.thumbnail || "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500";
         videoDuration.textContent = meta.duration_string || "00:00";
         videoTitle.textContent = meta.title || "Sin título";
-        videoChannel.innerHTML = `<i class="fas fa-user-circle"></i> ${meta.channel}`;
+        videoChannel.innerHTML = `<i class="fas fa-user-circle"></i> ${escapeHtml(meta.channel)}`;
         
         if (meta.views_string) {
             videoViews.innerHTML = `<i class="fas fa-eye"></i> ${meta.views_string} vistas`;
@@ -350,7 +350,7 @@ document.addEventListener("DOMContentLoaded", () => {
         playlistThumbnail.src = meta.thumbnail || "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500";
         playlistCount.textContent = `${meta.video_count} videos`;
         playlistTitle.textContent = meta.title || "Lista de reproducción sin título";
-        playlistChannel.innerHTML = `<i class="fas fa-list-ul"></i> ${meta.channel}`;
+        playlistChannel.innerHTML = `<i class="fas fa-list-ul"></i> ${escapeHtml(meta.channel)}`;
     }
 
     function renderPlaylist(data) {

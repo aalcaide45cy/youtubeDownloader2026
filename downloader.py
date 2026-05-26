@@ -1,5 +1,6 @@
 import os
 import yt_dlp
+import html
 
 COMMON_LANGUAGES = {
     'es': 'Español',
@@ -61,6 +62,11 @@ def extract_video_info(url, browser_name=None):
         'skip_download': True,
         'quiet': True,
         'no_warnings': True,
+        'extractor_args': {
+            'youtube': {
+                'lang': ['es']
+            }
+        }
     }
     
     if browser_name and browser_name.lower() != "none":
@@ -95,8 +101,8 @@ def extract_video_info(url, browser_name=None):
                 thumbnail_url = entries_raw[0].get('thumbnail')
 
             meta = {
-                'title': info.get('title') or "Lista de reproducción sin título",
-                'channel': info.get('uploader') or info.get('channel') or "Canal Desconocido",
+                'title': html.unescape(info.get('title') or "Lista de reproducción sin título"),
+                'channel': html.unescape(info.get('uploader') or info.get('channel') or "Canal Desconocido"),
                 'video_count': len(entries_raw),
                 'thumbnail': thumbnail_url
             }
@@ -108,12 +114,12 @@ def extract_video_info(url, browser_name=None):
                 entry_id = entry.get('id')
                 entries.append({
                     'id': entry_id,
-                    'title': entry.get('title') or "Vídeo sin título",
+                    'title': html.unescape(entry.get('title') or "Vídeo sin título"),
                     'url': entry.get('url') or f"https://www.youtube.com/watch?v={entry_id}",
                     'duration': entry.get('duration'),
                     'duration_string': format_duration(entry.get('duration', 0)),
                     'thumbnail': entry.get('thumbnails')[0]['url'] if entry.get('thumbnails') else (entry.get('thumbnail') or None),
-                    'channel': entry.get('uploader') or entry.get('channel') or ""
+                    'channel': html.unescape(entry.get('uploader') or entry.get('channel') or "")
                 })
 
             return {
@@ -128,6 +134,11 @@ def extract_video_info(url, browser_name=None):
         'youtube_include_dash_manifest': False,
         'quiet': True,
         'no_warnings': True,
+        'extractor_args': {
+            'youtube': {
+                'lang': ['es']
+            }
+        }
     }
     
     if browser_name and browser_name.lower() != "none":
@@ -145,11 +156,11 @@ def extract_video_info(url, browser_name=None):
         # Metadatos del video
         meta = {
             'id': info.get('id'),
-            'title': info.get('title'),
+            'title': html.unescape(info.get('title') or ""),
             'duration': info.get('duration'),
             'duration_string': format_duration(info.get('duration', 0)),
             'thumbnail': info.get('thumbnail') or (info.get('thumbnails')[-1]['url'] if info.get('thumbnails') else None),
-            'channel': info.get('uploader') or info.get('channel') or "Canal Desconocido",
+            'channel': html.unescape(info.get('uploader') or info.get('channel') or "Canal Desconocido"),
             'views': info.get('view_count'),
             'views_string': f"{info.get('view_count', 0):,}".replace(",", ".") if info.get('view_count') is not None else None
         }
@@ -344,6 +355,11 @@ def download_item(url, item_type, selection_val, download_dir, progress_callback
         'progress_hooks': [DownloadProgressHook(progress_callback, item_id)],
         'quiet': True,
         'no_warnings': True,
+        'extractor_args': {
+            'youtube': {
+                'lang': ['es']
+            }
+        }
     }
     
     if browser_name and browser_name.lower() != "none":
