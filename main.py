@@ -29,6 +29,31 @@ app.add_middleware(
 
 # Definir la ruta de descarga predeterminada (carpeta Descargas del usuario)
 DEFAULT_DOWNLOAD_DIR = str(pathlib.Path.home() / "Downloads")
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+
+def load_saved_download_dir():
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                saved_dir = data.get("download_dir")
+                if saved_dir and os.path.exists(saved_dir):
+                    return os.path.normpath(saved_dir)
+        except Exception:
+            pass
+    return os.path.normpath(DEFAULT_DOWNLOAD_DIR)
+
+def save_download_dir(folder_path):
+    try:
+        data = {}
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        data["download_dir"] = folder_path
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+    except Exception:
+        pass
 
 class AnalyzeRequest(BaseModel):
     url: str
@@ -54,11 +79,11 @@ class OpenFolderRequest(BaseModel):
 @app.get("/api/default-folder")
 def get_default_folder():
     """
-    Retorna la carpeta de descargas predeterminada del usuario.
+    Retorna la carpeta de descargas predeterminada o la guardada de forma persistente.
     """
     return {
         "status": "success",
-        "folder": os.path.normpath(DEFAULT_DOWNLOAD_DIR)
+        "folder": load_saved_download_dir()
     }
 
 @app.post("/api/open-folder")
@@ -95,7 +120,8 @@ def analyze_video(request: AnalyzeRequest):
 @app.post("/api/select-folder")
 def select_folder():
     """
-    Abre el diálogo nativo de Windows (tkinter) para elegir una carpeta de descarga.
+    Abre el diálogo nativo de Windows (tkinter) para elegir una carpeta de descarga
+    y la guarda de forma persistente en config.json.
     """
     try:
         import tkinter as tk
@@ -106,15 +132,19 @@ def select_folder():
         root.withdraw()
         root.attributes('-topmost', True) # Forzar ventana al frente
         
+        initial_dir = load_saved_download_dir()
+        
         # Mostrar el diálogo de selección de carpeta
         folder = filedialog.askdirectory(
             title="Seleccionar Carpeta para Guardar Descargas",
-            initialdir=DEFAULT_DOWNLOAD_DIR
+            initialdir=initial_dir
         )
         root.destroy()
         
         if folder:
-            return {"status": "success", "folder": os.path.normpath(folder)}
+            norm_folder = os.path.normpath(folder)
+            save_download_dir(norm_folder)
+            return {"status": "success", "folder": norm_folder}
         else:
             return {"status": "cancelled", "folder": None}
     except Exception as e:
@@ -126,7 +156,7 @@ def download_stream(request: DownloadRequest):
     Inicia la descarga de los elementos seleccionados de forma concurrente
     y transmite el progreso en tiempo real usando Server-Sent Events (SSE).
     """
-    download_dir = request.download_dir or DEFAULT_DOWNLOAD_DIR
+    download_dir = request.download_dir or load_saved_download_dir()
     if not os.path.exists(download_dir):
         try:
             os.makedirs(download_dir, exist_ok=True)
