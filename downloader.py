@@ -350,22 +350,41 @@ def download_item(url, item_type, selection_val, download_dir, progress_callback
         ydl_opts['cookiesfrombrowser'] = (browser_name.lower(),)
     
     if item_type == 'video':
-        if associated_audio_val:
-            ydl_opts['format'] = f"{selection_val}+{associated_audio_val}"
+        if selection_val.startswith('video_'):
+            # Modo de resolución máxima para playlist (video_best, video_1080, video_720...)
+            res = selection_val.split('_')[1]
+            if res == 'best':
+                ydl_opts['format'] = 'bestvideo+bestaudio/best'
+            else:
+                ydl_opts['format'] = f"bestvideo[height<={res}]+bestaudio/best"
         else:
-            # Si selection_val es 'bestvideo', lo usamos, de lo contrario usamos el id del formato
-            # Para playlists, selection_val es 'bestvideo+bestaudio/best' o 'best'
-            ydl_opts['format'] = selection_val
+            # Modo vídeo único con format_id específico
+            if associated_audio_val:
+                ydl_opts['format'] = f"{selection_val}+{associated_audio_val}"
+            else:
+                ydl_opts['format'] = f"{selection_val}+bestaudio/best"
         ydl_opts['merge_output_format'] = 'mp4'
+        
     elif item_type == 'audio':
-        ydl_opts['format'] = selection_val
-        # Si es para playlists o descarga rapida, podemos forzar conversion a mp3/m4a
-        if selection_val == 'bestaudio/best':
+        if selection_val.startswith('audio_'):
+            # Modo audio de playlist con bitrate específico (audio_320, audio_192, audio_128...)
+            bitrate = selection_val.split('_')[1]
+            ydl_opts['format'] = 'bestaudio/best'
             ydl_opts['postprocessors'] = [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
-                'preferredquality': '192',
+                'preferredquality': bitrate,
             }]
+        else:
+            # Modo audio único con format_id específico
+            ydl_opts['format'] = selection_val
+            if selection_val == 'bestaudio/best':
+                ydl_opts['postprocessors'] = [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }]
+                
     elif item_type == 'subtitle':
         ydl_opts['skip_download'] = True
         ydl_opts['writesubtitles'] = True

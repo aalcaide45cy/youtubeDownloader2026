@@ -171,8 +171,18 @@
                             <div class="playlist-download-mode-select">
                                 <span class="label" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-right: 0.5rem; text-transform: uppercase;">Descargar como:</span>
                                 <select id="playlist-download-mode" class="glass-select">
-                                    <option value="video">Video Completo (MP4)</option>
-                                    <option value="audio">Solo Audio (MP3)</option>
+                                    <optgroup label="Video (Fusion MP4)">
+                                        <option value="video_best">Video: Maxima calidad disponible</option>
+                                        <option value="video_1080">Video: 1080p (Full HD)</option>
+                                        <option value="video_720">Video: 720p (HD)</option>
+                                        <option value="video_480">Video: 480p (SD)</option>
+                                        <option value="video_360">Video: 360p</option>
+                                    </optgroup>
+                                    <optgroup label="Audio (Formato MP3)">
+                                        <option value="audio_320">Audio: 320 kbps (Alta calidad)</option>
+                                        <option value="audio_192">Audio: 192 kbps (Calidad estandar)</option>
+                                        <option value="audio_128">Audio: 128 kbps (Calidad basica)</option>
+                                    </optgroup>
                                 </select>
                             </div>
                         </div>

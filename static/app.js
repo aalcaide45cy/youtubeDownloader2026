@@ -491,19 +491,20 @@ document.addEventListener("DOMContentLoaded", () => {
         let itemsPayload = [];
         
         if (isPlaylist) {
-            const mode = playlistDownloadMode.value;
+            const mode = playlistDownloadMode.value; // e.g., 'video_1080' or 'audio_320'
+            const itemType = mode.startsWith('video_') ? 'video' : 'audio';
             itemsPayload = Array.from(selectedPlaylistItems.values()).map(entry => ({
                 id: `pl-${entry.id}`,
                 url: entry.url,
-                type: mode,
-                val: mode === 'video' ? 'bestvideo+bestaudio/best' : 'bestaudio/best',
+                type: itemType,
+                val: mode,
                 title: entry.title
             }));
             
             selectedPlaylistItems.forEach((entry) => {
                 createProgressCard({
                     id: `pl-${entry.id}`,
-                    type: mode,
+                    type: itemType,
                     title: entry.title
                 });
             });
