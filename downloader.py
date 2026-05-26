@@ -1,6 +1,28 @@
 import os
 import yt_dlp
 import html
+import re
+from yt_dlp.postprocessor.common import PostProcessor
+
+class EmojiCleanerPP(PostProcessor):
+    def run(self, info):
+        title = info.get('title')
+        if title:
+            try:
+                emoji_pattern = re.compile(
+                    '['
+                    '\U00010000-\U0010FFFF'  # Emojis modernos y planos suplementarios
+                    '\u2600-\u27BF'          # Símbolos misceláneos, dingbats, etc.
+                    '\u2300-\u23FF'          # Símbolos técnicos misceláneos
+                    ']+', 
+                    flags=re.UNICODE
+                )
+                cleaned = emoji_pattern.sub('', title)
+                cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+                info['title'] = cleaned
+            except Exception:
+                pass
+        return [], info
 
 COMMON_LANGUAGES = {
     'es': 'Español',
@@ -409,6 +431,7 @@ def download_item(url, item_type, selection_val, download_dir, progress_callback
         
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
+            ydl.add_post_processor(EmojiCleanerPP(), when='pre_process')
             ydl.download([url])
         except yt_dlp.utils.DownloadError as e:
             msg = str(e)
