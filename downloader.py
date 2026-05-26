@@ -52,19 +52,21 @@ def format_duration(seconds):
 
 def extract_video_info(url, browser_name=None):
     """
-    Extrae la información del video usando yt-dlp, opcionalmente cargando cookies de un navegador.
+    Extrae la información del enlace de YouTube (soporta vídeos individuales y playlists),
+    opcionalmente cargando cookies de un navegador.
     """
-    ydl_opts = {
+    # 1. Intentar extracción rápida (plana) para verificar si es una playlist
+    ydl_opts_flat = {
+        'extract_flat': 'in_playlist',
         'skip_download': True,
-        'youtube_include_dash_manifest': False,
         'quiet': True,
         'no_warnings': True,
     }
     
     if browser_name and browser_name.lower() != "none":
-        ydl_opts['cookiesfrombrowser'] = (browser_name.lower(),)
+        ydl_opts_flat['cookiesfrombrowser'] = (browser_name.lower(),)
         
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    with yt_dlp.YoutubeDL(ydl_opts_flat) as ydl:
         try:
             info = ydl.extract_info(url, download=False)
         except yt_dlp.utils.DownloadError as e:
@@ -76,10 +78,69 @@ def extract_video_info(url, browser_name=None):
                 )
             raise RuntimeError(f"Error al analizar el enlace de YouTube: {msg}")
         except Exception as e:
-            raise RuntimeError(f"Error inesperado al analizar el video: {str(e)}")
+            raise RuntimeError(f"Error inesperado al analizar el enlace: {str(e)}")
             
         if not info:
-            raise RuntimeError("No se pudo obtener información del video.")
+            raise RuntimeError("No se pudo obtener información del enlace.")
+
+        # 2. Si es una lista de reproducción (playlist)
+        if info.get('_type') == 'playlist' or 'entries' in info:
+            entries_raw = info.get('entries', [])
+            
+            # Formatear metadatos de la playlist
+            thumbnail_url = None
+            if info.get('thumbnails'):
+                thumbnail_url = info.get('thumbnails')[-1]['url']
+            elif len(entries_raw) > 0 and entries_raw[0] and entries_raw[0].get('thumbnail'):
+                thumbnail_url = entries_raw[0].get('thumbnail')
+
+            meta = {
+                'title': info.get('title') or "Lista de reproducción sin título",
+                'channel': info.get('uploader') or info.get('channel') or "Canal Desconocido",
+                'video_count': len(entries_raw),
+                'thumbnail': thumbnail_url
+            }
+
+            entries = []
+            for entry in entries_raw:
+                if not entry:
+                    continue
+                entry_id = entry.get('id')
+                entries.append({
+                    'id': entry_id,
+                    'title': entry.get('title') or "Vídeo sin título",
+                    'url': entry.get('url') or f"https://www.youtube.com/watch?v={entry_id}",
+                    'duration': entry.get('duration'),
+                    'duration_string': format_duration(entry.get('duration', 0)),
+                    'thumbnail': entry.get('thumbnails')[0]['url'] if entry.get('thumbnails') else (entry.get('thumbnail') or None),
+                    'channel': entry.get('uploader') or entry.get('channel') or ""
+                })
+
+            return {
+                'is_playlist': True,
+                'meta': meta,
+                'entries': entries
+            }
+
+    # 3. Si es un vídeo individual, hacemos la extracción completa de formatos
+    ydl_opts_full = {
+        'skip_download': True,
+        'youtube_include_dash_manifest': False,
+        'quiet': True,
+        'no_warnings': True,
+    }
+    
+    if browser_name and browser_name.lower() != "none":
+        ydl_opts_full['cookiesfrombrowser'] = (browser_name.lower(),)
+        
+    with yt_dlp.YoutubeDL(ydl_opts_full) as ydl:
+        try:
+            info = ydl.extract_info(url, download=False)
+        except Exception as e:
+            raise RuntimeError(f"Error al extraer formatos detallados del vídeo: {str(e)}")
+            
+        if not info:
+            raise RuntimeError("No se pudo obtener información detallada del vídeo.")
 
         # Metadatos del video
         meta = {
@@ -235,6 +296,7 @@ def extract_video_info(url, browser_name=None):
         subtitles.sort(key=lambda x: x['name'])
 
         return {
+            'is_playlist': False,
             'meta': meta,
             'video_formats': video_formats,
             'audio_formats': audio_formats,
@@ -291,10 +353,19 @@ def download_item(url, item_type, selection_val, download_dir, progress_callback
         if associated_audio_val:
             ydl_opts['format'] = f"{selection_val}+{associated_audio_val}"
         else:
-            ydl_opts['format'] = f"{selection_val}+bestaudio/best"
+            # Si selection_val es 'bestvideo', lo usamos, de lo contrario usamos el id del formato
+            # Para playlists, selection_val es 'bestvideo+bestaudio/best' o 'best'
+            ydl_opts['format'] = selection_val
         ydl_opts['merge_output_format'] = 'mp4'
     elif item_type == 'audio':
         ydl_opts['format'] = selection_val
+        # Si es para playlists o descarga rapida, podemos forzar conversion a mp3/m4a
+        if selection_val == 'bestaudio/best':
+            ydl_opts['postprocessors'] = [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }]
     elif item_type == 'subtitle':
         ydl_opts['skip_download'] = True
         ydl_opts['writesubtitles'] = True

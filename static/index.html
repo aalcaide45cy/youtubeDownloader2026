@@ -88,7 +88,8 @@
 
             <!-- Sección de Resultados (Oculta al inicio) -->
             <section id="results-section" class="results-section hidden">
-                <div class="results-grid">
+                <!-- VISTA DE VIDEO INDIVIDUAL -->
+                <div id="single-video-results" class="results-grid">
                     <!-- Tarjeta de Vista Previa del Video -->
                     <div class="video-preview-card glass-panel">
                         <div class="thumbnail-wrapper">
@@ -139,6 +140,44 @@
                                     <!-- Rellenado dinámicamente -->
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VISTA DE LISTA DE REPRODUCCION (PLAYLIST) -->
+                <div id="playlist-results" class="results-grid hidden">
+                    <!-- Tarjeta de Vista Previa de la Playlist -->
+                    <div class="video-preview-card glass-panel">
+                        <div class="thumbnail-wrapper">
+                            <img id="playlist-thumbnail" src="" alt="Miniatura de Playlist">
+                            <span id="playlist-count" class="duration-badge">0 videos</span>
+                        </div>
+                        <div class="video-info">
+                            <h2 id="playlist-title">Título de la Playlist</h2>
+                            <p id="playlist-channel" class="channel-name"><i class="fas fa-list-ul"></i> Canal</p>
+                        </div>
+                    </div>
+
+                    <!-- Panel de la Lista de Videos -->
+                    <div class="formats-panel glass-panel" style="max-height: 480px;">
+                        <div class="playlist-controls-header">
+                            <div class="playlist-selection-info">
+                                <label class="checkbox-custom-wrapper" style="margin-right: 0.5rem;">
+                                    <input type="checkbox" id="playlist-toggle-all">
+                                    <span class="checkbox-checkmark"></span>
+                                </label>
+                                <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">Seleccionar Todo</span>
+                            </div>
+                            <div class="playlist-download-mode-select">
+                                <span class="label" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-right: 0.5rem; text-transform: uppercase;">Descargar como:</span>
+                                <select id="playlist-download-mode" class="glass-select">
+                                    <option value="video">Video Completo (MP4)</option>
+                                    <option value="audio">Solo Audio (MP3)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="options-container scrollbar" id="playlist-videos-list" style="flex: 1; padding: 1rem;">
+                            <!-- Videos de la playlist rellenados dinámicamente -->
                         </div>
                     </div>
                 </div>

@@ -36,12 +36,14 @@ class AnalyzeRequest(BaseModel):
 
 class DownloadItemRequest(BaseModel):
     id: str
+    url: str # URL específica del vídeo a descargar
     type: str # 'video', 'audio', or 'subtitle'
-    val: str  # format_id o idioma del subtítulo
+    val: str  # format_id o 'bestvideo+bestaudio/best' o 'bestaudio/best'
+    title: str # Título del vídeo
     audio_val: Optional[str] = None # ID de audio específico asociado para combinar con el video
 
 class DownloadRequest(BaseModel):
-    url: str
+    url: Optional[str] = None
     items: List[DownloadItemRequest]
     download_dir: Optional[str] = None
     browser: Optional[str] = None
@@ -143,9 +145,10 @@ def download_stream(request: DownloadRequest):
                 item_type = item.type
                 val = item.val
                 audio_val = item.audio_val
+                item_url = item.url
                 
                 # Función que envolverá la llamada individual de descarga
-                def download_task(i_id, i_type, v, a_v):
+                def download_task(i_id, i_type, v, a_v, url):
                     try:
                         # Notificar inicio de la descarga
                         q.put({
@@ -162,7 +165,7 @@ def download_stream(request: DownloadRequest):
                             })
                         
                         download_item(
-                            request.url,
+                            url,
                             i_type,
                             v,
                             download_dir,
@@ -186,7 +189,7 @@ def download_stream(request: DownloadRequest):
                         })
 
                 # Lanzar tarea en el pool de hilos
-                futures.append(executor.submit(download_task, item_id, item_type, val, audio_val))
+                futures.append(executor.submit(download_task, item_id, item_type, val, audio_val, item_url))
             
             # Esperar a que terminen todas las descargas del pool
             for future in futures:

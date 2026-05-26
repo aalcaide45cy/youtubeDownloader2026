@@ -1053,5 +1053,52 @@ body {
     transform: translateY(0) scale(1);
 }
 
+/* Cabecera de controles de playlist */
+.playlist-controls-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.9rem 1.2rem;
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 19px 19px 0 0;
+}
+
+.playlist-selection-info {
+    display: flex;
+    align-items: center;
+}
+
+.playlist-download-mode-select {
+    display: flex;
+    align-items: center;
+}
+
+/* Select de estilo de cristal */
+.glass-select {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.35rem 0.8rem;
+    border-radius: 8px;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.glass-select:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--primary);
+}
+
+.glass-select option {
+    background: #0f0c24;
+    color: var(--text-main);
+}
+
+
 
 

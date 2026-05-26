@@ -35,6 +35,21 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // Selector de cookies del navegador
     const browserCookies = document.getElementById("browser-cookies");
+
+    // Vistas de resultados individuales vs playlists
+    const singleVideoResults = document.getElementById("single-video-results");
+    const playlistResults = document.getElementById("playlist-results");
+    
+    // Vista previa de playlist
+    const playlistThumbnail = document.getElementById("playlist-thumbnail");
+    const playlistCount = document.getElementById("playlist-count");
+    const playlistTitle = document.getElementById("playlist-title");
+    const playlistChannel = document.getElementById("playlist-channel");
+    
+    // Controles de playlist
+    const playlistToggleAll = document.getElementById("playlist-toggle-all");
+    const playlistDownloadMode = document.getElementById("playlist-download-mode");
+    const playlistVideosList = document.getElementById("playlist-videos-list");
     
     // Sección de Descargas Activas
     const downloadsSection = document.getElementById("downloads-section");
@@ -46,6 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // ==========================================================================
     let currentVideoData = null; // Almacena el resultado del análisis
     let selectedItems = new Map(); // Mapa de elementos seleccionados (key: item_id, value: item_object)
+    let selectedPlaylistItems = new Map(); // Mapa de videos seleccionados de la playlist (key: entry_id, value: entry_object)
     let currentDownloadFolder = ""; // Ruta actual de descarga
 
     // Cargar carpeta predeterminada al iniciar
@@ -101,6 +117,8 @@ document.addEventListener("DOMContentLoaded", () => {
         hideError();
         resultsSection.classList.add("hidden");
         selectedItems.clear();
+        selectedPlaylistItems.clear();
+        playlistToggleAll.checked = false;
         updateDownloadButtonState();
         
         // Mostrar esqueleto de carga y spinner de botón
@@ -122,8 +140,20 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             currentVideoData = data;
-            renderVideoInfo(data.meta);
-            renderFormats(data);
+            
+            if (data.is_playlist) {
+                // Ocultar vista individual, mostrar vista playlist
+                singleVideoResults.classList.add("hidden");
+                playlistResults.classList.remove("hidden");
+                renderPlaylistInfo(data.meta);
+                renderPlaylist(data);
+            } else {
+                // Mostrar vista individual, ocultar vista playlist
+                singleVideoResults.classList.remove("hidden");
+                playlistResults.classList.add("hidden");
+                renderVideoInfo(data.meta);
+                renderFormats(data);
+            }
             
             // Mostrar los resultados
             resultsSection.classList.remove("hidden");
@@ -307,10 +337,96 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function updateDownloadButtonState() {
-        const count = selectedItems.size;
+        const isPlaylist = currentVideoData && currentVideoData.is_playlist;
+        const count = isPlaylist ? selectedPlaylistItems.size : selectedItems.size;
         selectedCount.textContent = count;
         btnDownload.disabled = count === 0;
     }
+
+    // ==========================================================================
+    // RENDERIZAR RESULTADOS DE LISTA DE REPRODUCCIÓN (PLAYLIST)
+    // ==========================================================================
+    function renderPlaylistInfo(meta) {
+        playlistThumbnail.src = meta.thumbnail || "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500";
+        playlistCount.textContent = `${meta.video_count} videos`;
+        playlistTitle.textContent = meta.title || "Lista de reproducción sin título";
+        playlistChannel.innerHTML = `<i class="fas fa-list-ul"></i> ${meta.channel}`;
+    }
+
+    function renderPlaylist(data) {
+        playlistVideosList.innerHTML = "";
+        
+        if (data.entries && data.entries.length > 0) {
+            data.entries.forEach((entry, idx) => {
+                const item = createPlaylistRow(entry, idx);
+                playlistVideosList.appendChild(item);
+            });
+        } else {
+            playlistVideosList.innerHTML = `<p class="option-note" style="text-align:center; padding:2rem;">No se encontraron videos en la lista.</p>`;
+        }
+    }
+
+    function createPlaylistRow(entry, index) {
+        const row = document.createElement("div");
+        row.className = "option-row";
+        row.id = `pl-item-${entry.id}`;
+
+        row.innerHTML = `
+            <div class="option-left" style="flex: 1; overflow: hidden;">
+                <div class="checkbox-custom-wrapper">
+                    <input type="checkbox" id="chk-pl-${entry.id}">
+                    <span class="checkbox-checkmark"></span>
+                </div>
+                <img src="${entry.thumbnail || 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=50'}" alt="" style="width: 50px; height: 28px; object-fit: cover; border-radius: 4px; margin-left: 0.5rem; border: 1px solid rgba(255,255,255,0.05); flex-shrink: 0;">
+                <div class="option-details" style="margin-left: 0.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">
+                    <span class="option-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">${index + 1}. ${escapeHtml(entry.title)}</span>
+                    <span class="option-note">${escapeHtml(entry.channel || 'Canal desconocido')}</span>
+                </div>
+            </div>
+            <div class="option-right" style="flex-shrink: 0;">
+                <span class="option-size">${entry.duration_string || '00:00'}</span>
+            </div>
+        `;
+
+        row.addEventListener("click", (e) => {
+            if (e.target.tagName === "INPUT") return;
+            const chk = row.querySelector("input[type='checkbox']");
+            chk.checked = !chk.checked;
+            togglePlaylistRowSelection(row, chk.checked, entry);
+        });
+
+        const checkbox = row.querySelector("input[type='checkbox']");
+        checkbox.addEventListener("change", () => {
+            togglePlaylistRowSelection(row, checkbox.checked, entry);
+        });
+
+        return row;
+    }
+
+    function togglePlaylistRowSelection(row, isChecked, entry) {
+        if (isChecked) {
+            row.classList.add("selected");
+            selectedPlaylistItems.set(entry.id, entry);
+        } else {
+            row.classList.remove("selected");
+            selectedPlaylistItems.delete(entry.id);
+            playlistToggleAll.checked = false;
+        }
+        updateDownloadButtonState();
+    }
+
+    playlistToggleAll.addEventListener("change", () => {
+        const isChecked = playlistToggleAll.checked;
+        const checkboxes = playlistVideosList.querySelectorAll("input[type='checkbox']");
+        
+        checkboxes.forEach(chk => {
+            if (chk.checked !== isChecked) {
+                chk.checked = isChecked;
+                const event = new Event('change');
+                chk.dispatchEvent(event);
+            }
+        });
+    });
 
     function escapeHtml(text) {
         if (!text) return "";
@@ -358,7 +474,9 @@ document.addEventListener("DOMContentLoaded", () => {
     btnDownload.addEventListener("click", startDownloads);
 
     async function startDownloads() {
-        if (selectedItems.size === 0) return;
+        const isPlaylist = currentVideoData && currentVideoData.is_playlist;
+        const count = isPlaylist ? selectedPlaylistItems.size : selectedItems.size;
+        if (count === 0) return;
 
         // Desactivar interfaz durante descargas activas para evitar conflictos
         btnDownload.disabled = true;
@@ -368,29 +486,52 @@ document.addEventListener("DOMContentLoaded", () => {
         // Limpiar y mostrar el panel de descargas activas
         downloadsProgressList.innerHTML = "";
         downloadsSection.classList.remove("hidden");
-        downloadsTotalBadge.textContent = `${selectedItems.size} descarga(s)`;
+        downloadsTotalBadge.textContent = `${count} descarga(s)`;
 
-        // Detectar si hay un audio seleccionado de forma cruzada para combinar con los vídeos
-        const selectedAudio = Array.from(selectedItems.values()).find(info => info.type === 'audio');
+        let itemsPayload = [];
+        
+        if (isPlaylist) {
+            const mode = playlistDownloadMode.value;
+            itemsPayload = Array.from(selectedPlaylistItems.values()).map(entry => ({
+                id: `pl-${entry.id}`,
+                url: entry.url,
+                type: mode,
+                val: mode === 'video' ? 'bestvideo+bestaudio/best' : 'bestaudio/best',
+                title: entry.title
+            }));
+            
+            selectedPlaylistItems.forEach((entry) => {
+                createProgressCard({
+                    id: `pl-${entry.id}`,
+                    type: mode,
+                    title: entry.title
+                });
+            });
+        } else {
+            // Detectar si hay un audio seleccionado de forma cruzada para combinar con los vídeos
+            const selectedAudio = Array.from(selectedItems.values()).find(info => info.type === 'audio');
 
-        // Formatear items para enviar a la API
-        const itemsPayload = Array.from(selectedItems.values()).map(info => {
-            const item = {
-                id: info.id,
-                type: info.type,
-                val: info.val
-            };
-            // Si es video y el usuario seleccionó un audio de idioma específico, lo asociamos para fusión
-            if (info.type === "video" && selectedAudio) {
-                item.audio_val = selectedAudio.val;
-            }
-            return item;
-        });
+            // Formatear items para enviar a la API
+            itemsPayload = Array.from(selectedItems.values()).map(info => {
+                const item = {
+                    id: info.id,
+                    url: inputUrl.value.trim(),
+                    type: info.type,
+                    val: info.val,
+                    title: `${currentVideoData.meta.title} (${info.title})`
+                };
+                // Si es video y el usuario seleccionó un audio de idioma específico, lo asociamos para fusión
+                if (info.type === "video" && selectedAudio) {
+                    item.audio_val = selectedAudio.val;
+                }
+                return item;
+            });
 
-        // Crear elementos de progreso en la UI para cada item antes de iniciar
-        selectedItems.forEach((info) => {
-            createProgressCard(info);
-        });
+            // Crear elementos de progreso en la UI para cada item antes de iniciar
+            selectedItems.forEach((info) => {
+                createProgressCard(info);
+            });
+        }
 
         try {
             const response = await fetch("/api/download", {
@@ -399,7 +540,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    url: inputUrl.value.trim(),
                     items: itemsPayload,
                     download_dir: currentDownloadFolder,
                     browser: browserCookies.value
@@ -440,10 +580,13 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (err) {
             console.error("Error de descarga:", err);
             // Marcar todos los elementos pendientes con error
-            selectedItems.forEach((info) => {
-                const card = document.getElementById(`progress-card-${info.id}`);
+            const sourceItems = isPlaylist ? selectedPlaylistItems : selectedItems;
+            sourceItems.forEach((info) => {
+                const itemId = isPlaylist ? `pl-${info.id}` : info.id;
+                const card = document.getElementById(`progress-card-${itemId}`);
                 if (card) {
                     updateCardStatus(card, {
+                        id: itemId,
                         status: "failed",
                         error: err.message || "Error de red o conexión perdida."
                     });
